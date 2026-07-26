@@ -37,9 +37,7 @@ public class CorrelationEngine {
 	 * to the window.
 	 */
 	public void processEvent(Event newEvent) {
-		eventWindow.evictExpired(
-				newEvent.timestamp(),
-				matchingProperties.getMaxTimeGapSeconds());
+		eventWindow.evictExpired(matchingProperties.getMaxTimeGapSeconds());
 
 		boolean anyMatch = false;
 		for (Event existing : eventWindow.getRecentEvents()) {

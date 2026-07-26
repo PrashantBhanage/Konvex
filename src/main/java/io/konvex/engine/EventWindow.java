@@ -2,7 +2,6 @@ package io.konvex.engine;
 
 import io.konvex.model.Event;
 import java.time.Instant;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +14,14 @@ public class EventWindow {
 	private final ConcurrentLinkedQueue<Event> events = new ConcurrentLinkedQueue<>();
 
 	/**
-	 * Returns a snapshot of events currently held in the window.
+	 * Returns a live, allocation-free view of the events in the window.
+	 * <p>
+	 * {@link ConcurrentLinkedQueue} iteration is weakly-consistent and safe
+	 * without allocating a separate copy. Callers must not modify the queue
+	 * through this reference.
 	 */
-	public List<Event> getRecentEvents() {
-		return List.copyOf(events);
+	public Iterable<Event> getRecentEvents() {
+		return events;
 	}
 
 	/**
@@ -29,14 +32,18 @@ public class EventWindow {
 	}
 
 	/**
-	 * Removes events whose timestamps are older than {@code maxTimeGapSeconds}
-	 * relative to {@code now}.
+	 * Removes events that are older than {@code maxTimeGapSeconds} relative to
+	 * wall-clock time now.
+	 * <p>
+	 * Wall-clock ({@link Instant#now()}) is used deliberately: OpenSky
+	 * {@code lastContact} timestamps can lag several minutes behind real time,
+	 * so using the incoming event's timestamp would cause events from previous
+	 * poll cycles to appear "fresh" and accumulate unboundedly.
 	 *
-	 * @param now               reference instant (typically the incoming event's timestamp)
 	 * @param maxTimeGapSeconds maximum age in seconds to retain
 	 */
-	public void evictExpired(Instant now, long maxTimeGapSeconds) {
-		Instant cutoff = now.minusSeconds(maxTimeGapSeconds);
+	public void evictExpired(long maxTimeGapSeconds) {
+		Instant cutoff = Instant.now().minusSeconds(maxTimeGapSeconds);
 		events.removeIf(event -> event.timestamp().isBefore(cutoff));
 	}
 }
