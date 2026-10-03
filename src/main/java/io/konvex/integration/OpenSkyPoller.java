@@ -9,10 +9,12 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "konvex.opensky.enabled", havingValue = "true", matchIfMissing = true)
 public class OpenSkyPoller {
 
 	private static final Logger log = LoggerFactory.getLogger(OpenSkyPoller.class);
@@ -25,9 +27,13 @@ public class OpenSkyPoller {
 		this.correlationEngine = correlationEngine;
 	}
 
-	@Scheduled(fixedRate = 30_000L, initialDelay = 5_000L)
+	@Scheduled(
+			fixedRateString = "${konvex.opensky.poll-interval-ms:30000}",
+			initialDelayString = "${konvex.opensky.initial-delay-ms:5000}")
 	public void pollAndProcessFlights() {
+		long startedNanos = System.nanoTime();
 		List<OpenSkyFlightState> flights = openSkyClient.fetchCurrentStates();
+
 		if (flights.isEmpty()) {
 			log.warn("OpenSky poll returned no flight states");
 			return;
@@ -71,8 +77,13 @@ public class OpenSkyPoller {
 			}
 		}
 
-		log.info("OpenSky poll complete: total={}, processed={}, skipped={}",
-				flights.size(), processed, skipped);
+		long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
+		log.info(
+				"OpenSky poll complete: total={}, processed={}, skipped={}, durationMs={}",
+				flights.size(),
+				processed,
+				skipped,
+				durationMs);
 	}
 
 	private static String normalizeEventId(String icao24) {
