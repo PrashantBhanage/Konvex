@@ -1,3 +1,205 @@
 # Konvex
 
-IN PROGRESS!
+Konvex is a small real-time event correlation service built with Java 21 and Spring Boot.
+
+It accepts events from external sources, keeps a short event-time window, and looks for events that are close to each other in both location and time.
+
+The current defaults are:
+
+- Maximum distance: 5 km
+- Maximum time gap: 60 seconds
+
+## How it works
+
+```
+External event
+     |
+     v
+POST /api/events
+     |
+     v
+CorrelationEngine
+     |
+     +--> EventWindow
+     |      |
+     |      +--> time-based expiry
+     |      +--> geographic candidate lookup
+     |
+     +--> MatchingService
+            |
+            +--> Haversine distance
+            +--> time-gap check
+     |
+     v
+Correlation results
+```
+
+An event contains:
+
+```json
+{
+  "source": "camera-a",
+  "eventId": "evt-102",
+  "latitude": 28.6129,
+  "longitude": 77.2295,
+  "timestamp": "2026-10-03T17:00:00Z",
+  "metadata": {
+    "type": "vehicle"
+  }
+}
+```
+
+A match is returned when both configured thresholds are satisfied.
+
+## API
+
+### Health
+
+```bash
+curl http://localhost:8080/health
+```
+
+Response:
+
+```json
+{
+  "status": "UP"
+}
+```
+
+### Ingest an event
+
+Set an API key before starting the service:
+
+```bash
+export KONVEX_API_KEY=my-local-key
+```
+
+Then:
+
+```bash
+curl -X POST http://localhost:8080/api/events \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: my-local-key" \
+  -d '{
+    "source": "camera-a",
+    "eventId": "evt-101",
+    "latitude": 28.6129,
+    "longitude": 77.2295,
+    "timestamp": "2026-10-03T17:00:00Z",
+    "metadata": {}
+  }'
+```
+
+The response contains the accepted event ID and any matches found in the recent window.
+
+## OpenSky integration
+
+Konvex also includes a live OpenSky integration.
+
+Every poll cycle it:
+
+1. Fetches current aircraft states from OpenSky.
+2. Validates latitude, longitude, and aircraft ID.
+3. Converts the aircraft state into a Konvex event.
+4. Sends the event through the same correlation engine used by the REST API.
+
+OpenSky polling is enabled by default and runs every 30 seconds.
+
+The polling settings can be changed in `src/main/resources/application.properties`:
+
+```properties
+konvex.opensky.enabled=true
+konvex.opensky.poll-interval-ms=30000
+konvex.opensky.initial-delay-ms=5000
+konvex.opensky.base-url=https://opensky-network.org
+```
+
+The local correlation demo is separate and disabled by default. Enable it with:
+
+```properties
+konvex.demo.enabled=true
+```
+
+## Configuration
+
+Main matching settings:
+
+```properties
+konvex.matching.max-distance-km=5.0
+konvex.matching.max-time-gap-seconds=60
+```
+
+API-key authentication:
+
+```properties
+konvex.security.api-key=${KONVEX_API_KEY:}
+```
+
+Do not commit a real API key.
+
+## Run locally
+
+You need Java 21.
+
+On Linux/macOS:
+
+```bash
+./mvnw spring-boot:run
+```
+
+On Windows:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+Run the test suite with:
+
+```bash
+./mvnw test
+```
+
+## Project structure
+
+```
+src/main/java/io/konvex
+├── config
+├── controller
+├── engine
+├── integration
+├── model
+├── security
+├── service
+├── util
+└── web
+```
+
+The important flow is:
+
+```
+OpenSky / REST client
+        |
+        v
+      Event
+        |
+        v
+CorrelationEngine
+        |
+        +--> EventWindow
+        |
+        +--> MatchingService
+        |
+        v
+ CorrelationMatch
+```
+
+## Current scope
+
+Konvex is intentionally small and in-memory right now. It provides the correlation engine, REST ingestion, API-key protection, OpenSky polling, automated tests, and GitHub Actions CI.
+
+It does not currently persist events or correlation results to a database.
+
+## Development
+
+Every change should be covered by tests where practical. GitHub Actions runs the Maven test suite on pushes and pull requests.
