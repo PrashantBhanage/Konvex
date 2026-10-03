@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Streaming correlation engine: compares each incoming event against a recent
- * window and reports spatial/temporal matches.
+ * event-time window and reports spatial/temporal matches.
  */
 @Component
 public class CorrelationEngine {
@@ -40,12 +40,18 @@ public class CorrelationEngine {
 	 * configured spatial and temporal matching thresholds.
 	 */
 	public List<CorrelationMatch> processEvent(Event newEvent) {
-		eventWindow.evictExpired(matchingProperties.getMaxTimeGapSeconds());
+		eventWindow.evictExpired(
+				newEvent.timestamp(),
+				matchingProperties.getMaxTimeGapSeconds());
 
 		List<CorrelationMatch> matches = new ArrayList<>();
 		Instant detectedAt = Instant.now();
 
 		for (Event existing : eventWindow.getRecentEvents()) {
+			if (isSameObservation(existing, newEvent)) {
+				continue;
+			}
+
 			if (matchingService.isMatch(newEvent, existing)) {
 				double distanceKm = GeoUtils.haversineDistanceKm(
 						newEvent.latitude(),
@@ -90,5 +96,10 @@ public class CorrelationEngine {
 		}
 
 		return List.copyOf(matches);
+	}
+
+	private static boolean isSameObservation(Event first, Event second) {
+		return first.source().equals(second.source())
+				&& first.eventId().equals(second.eventId());
 	}
 }
