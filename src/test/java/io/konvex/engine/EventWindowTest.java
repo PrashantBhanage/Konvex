@@ -37,6 +37,45 @@ class EventWindowTest {
 		assertEquals(2, toList(window.getRecentEvents()).size());
 	}
 
+	@Test
+	void returnsNearbyCandidatesAndSkipsDistantBuckets() {
+		EventWindow window = new EventWindow();
+		Instant now = Instant.now();
+		Event reference = event("camera-a", "reference", 28.6129, 77.2295, now);
+
+		window.add(event("camera-b", "nearby", 28.6135, 77.2302, now));
+		window.add(event("camera-c", "far-away", 28.6129, 77.7400, now));
+
+		List<Event> candidates = window.getNearbyEvents(reference, 5.0);
+
+		assertEquals(1, candidates.size());
+		assertEquals("nearby", candidates.get(0).eventId());
+	}
+
+	@Test
+	void evictsEventsOutsideEventTimeWindow() {
+		EventWindow window = new EventWindow();
+		Instant referenceTime = Instant.parse("2026-03-15T10:31:00Z");
+
+		window.add(event(
+				"camera-a",
+				"old",
+				28.1,
+				77.1,
+				Instant.parse("2026-03-15T10:29:59Z")));
+		window.add(event(
+				"camera-b",
+				"fresh",
+				28.1,
+				77.1,
+				Instant.parse("2026-03-15T10:30:10Z")));
+
+		window.evictExpired(referenceTime, 60);
+
+		assertEquals(1, toList(window.getRecentEvents()).size());
+		assertEquals("fresh", toList(window.getRecentEvents()).get(0).eventId());
+	}
+
 	private static Event event(
 			String source,
 			String eventId,
