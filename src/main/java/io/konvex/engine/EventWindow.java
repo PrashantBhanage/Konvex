@@ -6,15 +6,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.springframework.stereotype.Component;
 
 /**
  * Thread-safe sliding window of recently seen events for stream correlation.
  *
- * <p>The window also keeps a coarse geographic index so the correlation engine
- * can inspect nearby events without scanning the entire stream.
+ * <p>The window keeps both a timestamp-ordered queue for expiry and a coarse
+ * geographic index for narrowing correlation candidates.
  */
 @Component
 public class EventWindow {
@@ -23,12 +23,14 @@ public class EventWindow {
 	private static final double LON_CELL_DEGREES = 0.1;
 	private static final int LON_BUCKET_COUNT = 3600;
 
-	private final ConcurrentLinkedQueue<Event> events = new ConcurrentLinkedQueue<>();
+	private final PriorityBlockingQueue<Event> events = new PriorityBlockingQueue<>(
+			128,
+			(eventA, eventB) -> eventA.timestamp().compareTo(eventB.timestamp()));
 	private final ConcurrentMap<EventKey, Event> latestByIdentity = new ConcurrentHashMap<>();
 	private final ConcurrentMap<GeoBucket, Set<Event>> buckets = new ConcurrentHashMap<>();
 
 	/**
-	 * Returns a live view of all events currently retained by the window.
+	 * Returns a weakly-consistent view of all queued observations.
 	 */
 	public Iterable<Event> getRecentEvents() {
 		return events;
@@ -44,15 +46,14 @@ public class EventWindow {
 
 		int latRadius = Math.max(
 				1,
-				(int) Math.ceil(
-						maxDistanceKm / (111.32 * LAT_CELL_DEGREES)));
+				(int) Math.ceil(maxDistanceKm / (111.32 * LAT_CELL_DEGREES)));
 
 		double latitudeRadians = Math.toRadians(reference.latitude());
 		double kmPerLongitudeDegree = 111.32 * Math.max(Math.cos(latitudeRadians), 0.01);
 		int lonRadius = Math.max(
 				1,
-				(int) Math.ceil(
-						maxDistanceKm / (kmPerLongitudeDegree * LON_CELL_DEGREES)));
+				(int) Math.ceil(maxDistanceKm
+						/ (kmPerLongitudeDegree * LON_CELL_DEGREES)));
 
 		List<Event> candidates = new ArrayList<>();
 		for (int latOffset = -latRadius; latOffset <= latRadius; latOffset++) {
@@ -70,8 +71,8 @@ public class EventWindow {
 	}
 
 	/**
-	 * Adds a newly seen event and replaces any older observation with the same
-	 * source and event ID.
+	 * Adds a newly seen event and replaces any older indexed observation with
+	 * the same source and event ID.
 	 */
 	public void add(Event event) {
 		EventKey key = new EventKey(event.source(), event.eventId());
@@ -88,13 +89,18 @@ public class EventWindow {
 	}
 
 	/**
-	 * Removes observations that fall outside the configured event-time window.
+	 * Removes timestamp-expired observations from the head of the ordered queue.
 	 */
 	public void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
 		Instant cutoff = referenceTime.minusSeconds(maxTimeGapSeconds);
 
-		for (Event event : events) {
-			if (event.timestamp().isBefore(cutoff) && events.remove(event)) {
+		while (true) {
+			Event event = events.peek();
+			if (event == null || !event.timestamp().isBefore(cutoff)) {
+				return;
+			}
+
+			if (events.poll() == event) {
 				removeFromBucket(event);
 				EventKey key = new EventKey(event.source(), event.eventId());
 				latestByIdentity.remove(key, event);
