@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.konvex.config.SecurityProperties;
+import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -25,10 +25,8 @@ class ApiKeyAuthenticationFilterTest {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		AtomicBoolean chainCalled = new AtomicBoolean();
 
-		filter.doFilter(
-				request,
-				response,
-				new MockFilterChain((req, res) -> chainCalled.set(true)));
+		FilterChain chain = (req, res) -> chainCalled.set(true);
+		filter.doFilter(request, response, chain);
 
 		assertEquals(200, response.getStatus());
 		assertTrue(chainCalled.get());
@@ -44,10 +42,8 @@ class ApiKeyAuthenticationFilterTest {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		AtomicBoolean chainCalled = new AtomicBoolean();
 
-		filter.doFilter(
-				request,
-				response,
-				new MockFilterChain((req, res) -> chainCalled.set(true)));
+		FilterChain chain = (req, res) -> chainCalled.set(true);
+		filter.doFilter(request, response, chain);
 
 		assertEquals(401, response.getStatus());
 		assertFalse(chainCalled.get());
@@ -62,7 +58,10 @@ class ApiKeyAuthenticationFilterTest {
 		request.addHeader(ApiKeyAuthenticationFilter.API_KEY_HEADER, "test-key");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
-		filter.doFilter(request, response, new MockFilterChain());
+		FilterChain chain = (req, res) -> {
+			throw new AssertionError("chain should not be called");
+		};
+		filter.doFilter(request, response, chain);
 
 		assertEquals(401, response.getStatus());
 	}
