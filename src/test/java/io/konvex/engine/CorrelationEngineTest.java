@@ -54,6 +54,16 @@ class CorrelationEngineTest {
 	}
 
 	@Test
+	void doesNotCorrelateTheSameObservation() {
+		Event first = event("OpenSky", "aircraft-1", 28.6129, 77.2295, baseTime);
+		Event repeated = event("OpenSky", "aircraft-1", 28.6130, 77.2296, baseTime.plusSeconds(10));
+
+		correlationEngine.processEvent(first);
+
+		assertTrue(correlationEngine.processEvent(repeated).isEmpty());
+	}
+
+	@Test
 	void canReturnMultipleMatches() {
 		Event first = event("camera-a", "evt-1", 28.6129, 77.2295, baseTime);
 		Event second = event("sensor-b", "evt-2", 28.6132, 77.2298, baseTime.plusSeconds(5));
