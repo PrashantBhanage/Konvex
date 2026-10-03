@@ -30,10 +30,10 @@ public class EventWindow {
 	private final ConcurrentMap<GeoBucket, Set<Event>> buckets = new ConcurrentHashMap<>();
 
 	/**
-	 * Returns a weakly-consistent view of all queued observations.
+	 * Returns the latest retained observation for each source/event ID.
 	 */
 	public Iterable<Event> getRecentEvents() {
-		return events;
+		return latestByIdentity.values();
 	}
 
 	/**
