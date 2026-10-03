@@ -25,9 +25,13 @@ public class EventWindow {
 	}
 
 	/**
-	 * Adds a newly seen event to the window.
+	 * Adds a newly seen event and replaces any older observation with the same
+	 * source and event ID.
 	 */
 	public void add(Event event) {
+		events.removeIf(existing ->
+				existing.source().equals(event.source())
+						&& existing.eventId().equals(event.eventId()));
 		events.add(event);
 	}
 
@@ -36,9 +40,8 @@ public class EventWindow {
 	 * wall-clock time now.
 	 * <p>
 	 * Wall-clock ({@link Instant#now()}) is used deliberately: OpenSky
-	 * {@code lastContact} timestamps can lag several minutes behind real time,
-	 * so using the incoming event's timestamp would cause events from previous
-	 * poll cycles to appear "fresh" and accumulate unboundedly.
+	 * {@code lastContact} timestamps can lag behind real time, so using the
+	 * incoming event's timestamp would allow stale observations to accumulate.
 	 *
 	 * @param maxTimeGapSeconds maximum age in seconds to retain
 	 */
