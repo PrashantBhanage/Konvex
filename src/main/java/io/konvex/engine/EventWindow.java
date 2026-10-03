@@ -15,10 +15,6 @@ public class EventWindow {
 
 	/**
 	 * Returns a live, allocation-free view of the events in the window.
-	 * <p>
-	 * {@link ConcurrentLinkedQueue} iteration is weakly-consistent and safe
-	 * without allocating a separate copy. Callers must not modify the queue
-	 * through this reference.
 	 */
 	public Iterable<Event> getRecentEvents() {
 		return events;
@@ -36,17 +32,12 @@ public class EventWindow {
 	}
 
 	/**
-	 * Removes events that are older than {@code maxTimeGapSeconds} relative to
-	 * wall-clock time now.
-	 * <p>
-	 * Wall-clock ({@link Instant#now()}) is used deliberately: OpenSky
-	 * {@code lastContact} timestamps can lag behind real time, so using the
-	 * incoming event's timestamp would allow stale observations to accumulate.
-	 *
-	 * @param maxTimeGapSeconds maximum age in seconds to retain
+	 * Removes observations that fall outside the configured event-time window.
+	 * Using the incoming event timestamp keeps correlation correct when a source
+	 * delivers events with a delayed or historical timestamp.
 	 */
-	public void evictExpired(long maxTimeGapSeconds) {
-		Instant cutoff = Instant.now().minusSeconds(maxTimeGapSeconds);
+	public void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
+		Instant cutoff = referenceTime.minusSeconds(maxTimeGapSeconds);
 		events.removeIf(event -> event.timestamp().isBefore(cutoff));
 	}
 }
