@@ -1,10 +1,14 @@
 package io.konvex.engine;
 
 import io.konvex.config.MatchingProperties;
+import io.konvex.model.CorrelationMatch;
 import io.konvex.model.Event;
 import io.konvex.service.MatchingService;
 import io.konvex.util.GeoUtils;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,17 +36,17 @@ public class CorrelationEngine {
 	}
 
 	/**
-	 * Processes a single event: evicts stale window entries, compares against
-	 * remaining events, logs matches (or lack thereof), then adds the event
-	 * to the window.
+	 * Processes a single event and returns all recent events that satisfy the
+	 * configured spatial and temporal matching thresholds.
 	 */
-	public void processEvent(Event newEvent) {
+	public List<CorrelationMatch> processEvent(Event newEvent) {
 		eventWindow.evictExpired(matchingProperties.getMaxTimeGapSeconds());
 
-		boolean anyMatch = false;
+		List<CorrelationMatch> matches = new ArrayList<>();
+		Instant detectedAt = Instant.now();
+
 		for (Event existing : eventWindow.getRecentEvents()) {
 			if (matchingService.isMatch(newEvent, existing)) {
-				anyMatch = true;
 				double distanceKm = GeoUtils.haversineDistanceKm(
 						newEvent.latitude(),
 						newEvent.longitude(),
@@ -50,6 +54,17 @@ public class CorrelationEngine {
 						existing.longitude());
 				long timeGapSeconds = Math.abs(
 						Duration.between(newEvent.timestamp(), existing.timestamp()).getSeconds());
+
+				CorrelationMatch match = new CorrelationMatch(
+						newEvent.eventId(),
+						newEvent.source(),
+						existing.eventId(),
+						existing.source(),
+						distanceKm,
+						timeGapSeconds,
+						detectedAt);
+
+				matches.add(match);
 
 				log.info(
 						"MATCHED | new={} ({}) <-> existing={} ({}) | distance={} km | timeGap={} s",
@@ -64,14 +79,16 @@ public class CorrelationEngine {
 
 		eventWindow.add(newEvent);
 
-		if (!anyMatch) {
+		if (matches.isEmpty()) {
 			log.info(
-					"NEW unmatched event | id={} source={} lat={} lon={} at={}",
-					newEvent.eventId(),
-					newEvent.source(),
-					newEvent.latitude(),
-					newEvent.longitude(),
-					newEvent.timestamp());
+						"NEW unmatched event | id={} source={} lat={} lon={} at={}",
+						newEvent.eventId(),
+						newEvent.source(),
+						newEvent.latitude(),
+						newEvent.longitude(),
+						newEvent.timestamp());
 		}
+
+		return List.copyOf(matches);
 	}
 }
