@@ -8,7 +8,7 @@ public class SecurityProperties {
 	/**
 	 * Expected value of the {@code X-API-Key} request header for service-to-service calls.
 	 */
-	private String apiKey = "change-me-override-via-env";
+	private String apiKey = "";
 
 	public String getApiKey() {
 		return apiKey;
