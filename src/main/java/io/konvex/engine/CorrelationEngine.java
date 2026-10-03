@@ -36,8 +36,8 @@ public class CorrelationEngine {
 	}
 
 	/**
-	 * Processes a single event and returns all recent events that satisfy the
-	 * configured spatial and temporal matching thresholds.
+	 * Processes a single event and returns all nearby recent events that satisfy
+	 * the configured spatial and temporal matching thresholds.
 	 */
 	public List<CorrelationMatch> processEvent(Event newEvent) {
 		eventWindow.evictExpired(
@@ -47,7 +47,9 @@ public class CorrelationEngine {
 		List<CorrelationMatch> matches = new ArrayList<>();
 		Instant detectedAt = Instant.now();
 
-		for (Event existing : eventWindow.getRecentEvents()) {
+		for (Event existing : eventWindow.getNearbyEvents(
+				newEvent,
+				matchingProperties.getMaxDistanceKm())) {
 			if (isSameObservation(existing, newEvent)) {
 				continue;
 			}
