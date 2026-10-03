@@ -11,16 +11,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
 	@ExceptionHandler(IllegalArgumentException.class)
-	public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+	public ResponseEntity<Map<String, String>> handleIllegalArgument(
+			IllegalArgumentException ex) {
+		String message = ex.getMessage() == null
+				? "Request contains invalid data"
+				: ex.getMessage();
+
 		return ResponseEntity
 				.status(HttpStatus.BAD_REQUEST)
 				.body(Map.of(
 						"error", "Bad Request",
-						"message", ex.getMessage()));
+						"message", message));
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	public ResponseEntity<Map<String, String>> handleUnreadableBody(HttpMessageNotReadableException ex) {
+	public ResponseEntity<Map<String, String>> handleUnreadableBody(
+			HttpMessageNotReadableException ex) {
 		Throwable cause = ex;
 		while (cause != null) {
 			if (cause instanceof IllegalArgumentException illegalArgumentException) {

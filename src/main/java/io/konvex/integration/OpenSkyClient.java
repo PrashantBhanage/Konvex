@@ -1,5 +1,6 @@
 package io.konvex.integration;
 
+import io.konvex.config.OpenSkyProperties;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -16,10 +17,10 @@ public class OpenSkyClient {
 
 	private final RestClient restClient;
 
-	public OpenSkyClient() {
+	public OpenSkyClient(OpenSkyProperties properties) {
 		this.restClient = RestClient
 				.builder()
-				.baseUrl("https://opensky-network.org")
+				.baseUrl(properties.getBaseUrl())
 				.build();
 	}
 

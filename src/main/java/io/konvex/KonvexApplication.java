@@ -1,6 +1,7 @@
 package io.konvex;
 
 import io.konvex.config.MatchingProperties;
+import io.konvex.config.OpenSkyProperties;
 import io.konvex.config.SecurityProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,7 +10,11 @@ import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoCon
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
-@EnableConfigurationProperties({MatchingProperties.class, SecurityProperties.class})
+@EnableConfigurationProperties({
+		MatchingProperties.class,
+		SecurityProperties.class,
+		OpenSkyProperties.class
+})
 @EnableScheduling
 public class KonvexApplication {
 

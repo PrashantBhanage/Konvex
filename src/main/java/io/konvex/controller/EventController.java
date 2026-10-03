@@ -1,8 +1,9 @@
 package io.konvex.controller;
 
 import io.konvex.engine.CorrelationEngine;
+import io.konvex.model.CorrelationMatch;
 import io.konvex.model.Event;
-import java.util.Map;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,12 +22,15 @@ public class EventController {
 	}
 
 	@PostMapping
-	public ResponseEntity<Map<String, String>> ingestEvent(@RequestBody Event event) {
-		correlationEngine.processEvent(event);
+	public ResponseEntity<EventIngestResponse> ingestEvent(@RequestBody Event event) {
+		List<CorrelationMatch> matches = correlationEngine.processEvent(event);
+
 		return ResponseEntity
 				.status(HttpStatus.ACCEPTED)
-				.body(Map.of(
-						"status", "accepted",
-						"eventId", event.eventId()));
+				.body(new EventIngestResponse(
+						"accepted",
+						event.eventId(),
+						matches.size(),
+						matches));
 	}
 }

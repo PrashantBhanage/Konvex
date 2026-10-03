@@ -37,8 +37,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		String path = request.getRequestURI();
-		return "/health".equals(path);
+		return "/health".equals(request.getRequestURI());
 	}
 
 	@Override
@@ -50,7 +49,11 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 		String providedKey = request.getHeader(API_KEY_HEADER);
 		String expectedKey = securityProperties.getApiKey();
 
-		if (providedKey == null || !constantTimeEquals(expectedKey, providedKey)) {
+		if (expectedKey == null
+				|| expectedKey.isBlank()
+				|| providedKey == null
+				|| providedKey.isBlank()
+				|| !constantTimeEquals(expectedKey, providedKey)) {
 			writeUnauthorized(response);
 			return;
 		}
@@ -61,8 +64,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 						null,
 						AuthorityUtils.NO_AUTHORITIES);
 
-		// Spring Security 6+: SecurityContextHolderFilter only *loads* the context;
-		// callers must explicitly save it so later filters (AuthorizationFilter) see it.
 		SecurityContext context = SecurityContextHolder.createEmptyContext();
 		context.setAuthentication(authentication);
 		SecurityContextHolder.setContext(context);
