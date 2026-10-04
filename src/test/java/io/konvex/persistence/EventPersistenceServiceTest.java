@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import io.konvex.model.CorrelationMatch;
 import io.konvex.model.Event;
+import io.konvex.persistence.entity.EventEntity;
 import io.konvex.persistence.entity.CorrelationMatchEntity;
 import io.konvex.persistence.repository.CorrelationMatchRepository;
 import io.konvex.persistence.repository.EventRepository;
@@ -33,8 +34,7 @@ class EventPersistenceServiceTest {
 
 		service.persist(event, List.of(match));
 
-		ArgumentCaptor<io.konvex.persistence.entity.EventEntity> eventCaptor =
-				ArgumentCaptor.forClass(io.konvex.persistence.entity.EventEntity.class);
+		ArgumentCaptor<EventEntity> eventCaptor = ArgumentCaptor.forClass(EventEntity.class);
 		verify(eventRepository).save(eventCaptor.capture());
 		EventEntity savedEvent = eventCaptor.getValue();
 		assertEquals("camera-a", savedEvent.getSource());
