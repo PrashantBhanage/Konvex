@@ -14,7 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -32,7 +32,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class HistoryApiPostgresIntegrationTest {
 
 	@Container
-	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+	static final PostgreSQLContainer postgres = new PostgreSQLContainer<>("postgres:16-alpine")
 			.withDatabaseName("konvex")
 			.withUsername("konvex")
 			.withPassword("konvex");
