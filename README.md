@@ -98,6 +98,24 @@ curl -X POST http://localhost:8080/api/events \
 
 The response contains the accepted event ID and any matches found in the recent window.
 
+### Match history
+
+Query persisted correlation matches with optional ISO-8601 `from`/`to` timestamps and source filtering. `page` is zero-based and `size` must be between 1 and 100.
+
+```bash
+curl "http://localhost:8080/api/matches?from=2026-03-15T10:00:00Z&to=2026-03-15T11:00:00Z&source=camera-a&page=0&size=20" \
+  -H "X-API-Key: my-local-key"
+```
+
+### Event history
+
+Fetch all persisted observations for a source and event ID, newest first:
+
+```bash
+curl "http://localhost:8080/api/events/OpenSky/abc123" \
+  -H "X-API-Key: my-local-key"
+```
+
 ## OpenSky integration
 
 Konvex also includes a live OpenSky integration.
