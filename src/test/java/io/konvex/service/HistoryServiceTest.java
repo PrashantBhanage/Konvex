@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
@@ -28,7 +29,9 @@ class HistoryServiceTest {
 		CorrelationMatchEntity entity = CorrelationMatchEntity.builder()
 				.id(7L).eventId("evt-2").source("camera-b").matchedEventId("evt-1").matchedSource("camera-a")
 				.distanceKm(1.2).timeGapSeconds(9).detectedAt(Instant.parse("2026-03-15T10:30:09Z")).build();
-		when(matchRepository.findAll(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(Pageable.class)))
+		when(matchRepository.findAll(
+				org.mockito.ArgumentMatchers.<Specification<CorrelationMatchEntity>>any(),
+				org.mockito.ArgumentMatchers.any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(entity), Pageable.ofSize(10), 1));
 
 		PageResponse<?> response = service.findMatches(
