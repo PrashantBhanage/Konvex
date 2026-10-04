@@ -1,13 +1,15 @@
 package io.konvex.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import io.konvex.config.MatchingProperties;
-import io.konvex.engine.CorrelationEngine;
-import io.konvex.engine.EventWindow;
+import io.konvex.model.CorrelationMatch;
 import io.konvex.model.Event;
-import io.konvex.service.MatchingService;
+import io.konvex.service.EventIngestionService;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -17,12 +19,8 @@ class EventControllerTest {
 
 	@Test
 	void returnsCorrelationResultsAfterAcceptingEvent() {
-		MatchingProperties properties = new MatchingProperties();
-		CorrelationEngine engine = new CorrelationEngine(
-				new MatchingService(properties),
-				properties,
-				new EventWindow());
-		EventController controller = new EventController(engine);
+		EventIngestionService ingestionService = mock(EventIngestionService.class);
+		EventController controller = new EventController(ingestionService);
 
 		Event first = new Event(
 				"camera-a",
@@ -39,6 +37,17 @@ class EventControllerTest {
 				first.timestamp().plusSeconds(10),
 				Map.of());
 
+		when(ingestionService.ingest(first)).thenReturn(List.of());
+		CorrelationMatch match = new CorrelationMatch(
+				"evt-2",
+				"camera-b",
+				"evt-1",
+				"camera-a",
+				0.1,
+				10,
+				Instant.now());
+		when(ingestionService.ingest(second)).thenReturn(List.of(match));
+
 		ResponseEntity<EventIngestResponse> firstResponse = controller.ingestEvent(first);
 		ResponseEntity<EventIngestResponse> secondResponse = controller.ingestEvent(second);
 
@@ -46,5 +55,7 @@ class EventControllerTest {
 		assertEquals(HttpStatus.ACCEPTED, secondResponse.getStatusCode());
 		assertEquals("evt-2", secondResponse.getBody().eventId());
 		assertEquals(1, secondResponse.getBody().matchCount());
+		verify(ingestionService).ingest(first);
+		verify(ingestionService).ingest(second);
 	}
 }

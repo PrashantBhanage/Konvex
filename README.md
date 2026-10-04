@@ -18,6 +18,9 @@ External event
 POST /api/events
      |
      v
+EventIngestionService
+     |
+     v
 CorrelationEngine
      |
      +--> EventWindow
@@ -29,6 +32,8 @@ CorrelationEngine
             |
             +--> Haversine distance
             +--> time-gap check
+     |
+     +--> PostgreSQL history
      |
      v
 Correlation results
@@ -169,6 +174,9 @@ src/main/java/io/konvex
 ├── engine
 ├── integration
 ├── model
+├── persistence
+│   ├── entity
+│   └── repository
 ├── security
 ├── service
 ├── util
@@ -194,11 +202,25 @@ CorrelationEngine
  CorrelationMatch
 ```
 
+## PostgreSQL history
+
+Konvex persists every accepted event and correlation match in PostgreSQL. The in-memory EventWindow remains the real-time matching fast path; PostgreSQL is used for durable history.
+
+Set the database connection with environment variables:
+
+```bash
+export KONVEX_DB_URL=jdbc:postgresql://localhost:5432/konvex
+export KONVEX_DB_USERNAME=konvex
+export KONVEX_DB_PASSWORD=your-password
+```
+
+Flyway owns the schema and Hibernate validates it on startup. The migration creates timestamp indexes for event and match history queries.
+
 ## Current scope
 
-Konvex is intentionally small and in-memory right now. It provides the correlation engine, REST ingestion, API-key protection, OpenSky polling, automated tests, and GitHub Actions CI.
+Konvex now combines an in-memory spatial-temporal correlation window with PostgreSQL-backed event and match history.
 
-It does not currently persist events or correlation results to a database.
+It does not yet provide distributed event processing or shared state across multiple application instances.
 
 ## Development
 
