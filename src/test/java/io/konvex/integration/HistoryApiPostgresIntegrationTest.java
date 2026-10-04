@@ -32,7 +32,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class HistoryApiPostgresIntegrationTest {
 
 	@Container
-	static final PostgreSQLContainer postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+	static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine")
 			.withDatabaseName("konvex")
 			.withUsername("konvex")
 			.withPassword("konvex");
