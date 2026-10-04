@@ -47,7 +47,7 @@ public class CorrelationEngine {
 		List<CorrelationMatch> matches = new ArrayList<>();
 		Instant detectedAt = Instant.now();
 
-		for (Event existing : eventWindow.getNearbyEvents(
+		for (Event existing : eventStore.getNearbyEvents(
 				newEvent,
 				matchingProperties.getMaxDistanceKm())) {
 			if (isSameObservation(existing, newEvent)) {
@@ -85,7 +85,7 @@ public class CorrelationEngine {
 			}
 		}
 
-		eventWindow.add(newEvent);
+		eventStore.add(newEvent);
 
 		if (matches.isEmpty()) {
 			log.info(
