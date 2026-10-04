@@ -5,8 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.konvex.model.Event;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class EventWindowTest {
@@ -74,6 +81,75 @@ class EventWindowTest {
 
 		assertEquals(1, toList(window.getRecentEvents()).size());
 		assertEquals("fresh", toList(window.getRecentEvents()).get(0).eventId());
+	}
+
+	@Test
+	void remainsConsistentWhenManyThreadsIngestConcurrentEvents() throws Exception {
+		EventWindow window = new EventWindow();
+		Instant baseTime = Instant.parse("2026-03-15T10:30:00Z");
+
+		int workerCount = 8;
+		int uniqueEventsPerWorker = 100;
+		int sharedUpdatesPerWorker = 50;
+
+		ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+		CountDownLatch start = new CountDownLatch(1);
+		List<Future<?>> futures = new ArrayList<>();
+
+		try {
+			for (int worker = 0; worker < workerCount; worker++) {
+				final int workerId = worker;
+				futures.add(executor.submit(() -> {
+					start.await();
+
+					for (int i = 0; i < uniqueEventsPerWorker; i++) {
+						window.add(event(
+								"worker-" + workerId,
+								"event-" + i,
+								10.0 + workerId,
+								70.0 + (i * 0.01),
+								baseTime.plusNanos(i)));
+					}
+
+					for (int i = 0; i < sharedUpdatesPerWorker; i++) {
+						window.add(event(
+								"shared",
+								"shared-event",
+								0.0,
+								0.0,
+								baseTime.plusNanos(i)));
+					}
+
+					return null;
+				}));
+			}
+
+			start.countDown();
+
+			for (Future<?> future : futures) {
+				future.get(30, TimeUnit.SECONDS);
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+
+		List<Event> recent = toList(window.getRecentEvents());
+		Set<String> identities = new HashSet<>();
+		for (Event event : recent) {
+			identities.add(event.source() + '\u0000' + event.eventId());
+		}
+
+		assertEquals(
+				workerCount * uniqueEventsPerWorker + 1,
+				recent.size());
+		assertEquals(recent.size(), identities.size());
+
+		List<Event> sharedCandidates = window.getNearbyEvents(
+				event("probe", "probe", 0.0, 0.0, baseTime),
+				5.0);
+
+		assertEquals(1, sharedCandidates.size());
+		assertEquals("shared-event", sharedCandidates.get(0).eventId());
 	}
 
 	private static Event event(

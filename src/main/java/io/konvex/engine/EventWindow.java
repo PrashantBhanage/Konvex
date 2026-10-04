@@ -3,18 +3,20 @@ package io.konvex.engine;
 import io.konvex.model.Event;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.PriorityBlockingQueue;
 import org.springframework.stereotype.Component;
 
 /**
  * Thread-safe sliding window of recently seen events for stream correlation.
  *
- * <p>The window keeps both a timestamp-ordered queue for expiry and a coarse
- * geographic index for narrowing correlation candidates.
+ * <p>All state changes and multi-structure reads are protected by the instance
+ * monitor. A simple monitor is intentional here because an event update must
+ * stay atomic across the timestamp queue, identity index, and geographic index.
  */
 @Component
 public class EventWindow {
@@ -23,24 +25,25 @@ public class EventWindow {
 	private static final double LON_CELL_DEGREES = 0.1;
 	private static final int LON_BUCKET_COUNT = 3600;
 
-	private final PriorityBlockingQueue<Event> events = new PriorityBlockingQueue<>(
+	private final PriorityQueue<Event> events = new PriorityQueue<>(
 			128,
 			(eventA, eventB) -> eventA.timestamp().compareTo(eventB.timestamp()));
-	private final ConcurrentMap<EventKey, Event> latestByIdentity = new ConcurrentHashMap<>();
-	private final ConcurrentMap<GeoBucket, Set<Event>> buckets = new ConcurrentHashMap<>();
+	private final Map<EventKey, Event> latestByIdentity = new HashMap<>();
+	private final Map<GeoBucket, Set<Event>> buckets = new HashMap<>();
 
 	/**
-	 * Returns the latest retained observation for each source/event ID.
+	 * Returns a stable snapshot containing the latest retained observation for
+	 * each source/event ID.
 	 */
-	public Iterable<Event> getRecentEvents() {
-		return latestByIdentity.values();
+	public synchronized List<Event> getRecentEvents() {
+		return List.copyOf(latestByIdentity.values());
 	}
 
 	/**
 	 * Returns events from geographic buckets that could contain a match within
 	 * {@code maxDistanceKm}. The caller still performs the exact Haversine check.
 	 */
-	public List<Event> getNearbyEvents(Event reference, double maxDistanceKm) {
+	public synchronized List<Event> getNearbyEvents(Event reference, double maxDistanceKm) {
 		int centerLatBucket = latBucket(reference.latitude());
 		int centerLonBucket = lonBucket(reference.longitude());
 
@@ -74,7 +77,7 @@ public class EventWindow {
 	 * Adds a newly seen event and replaces any older indexed observation with
 	 * the same source and event ID.
 	 */
-	public void add(Event event) {
+	public synchronized void add(Event event) {
 		EventKey key = new EventKey(event.source(), event.eventId());
 		Event previous = latestByIdentity.put(key, event);
 
@@ -84,14 +87,14 @@ public class EventWindow {
 
 		events.add(event);
 		buckets
-				.computeIfAbsent(bucketFor(event), ignored -> ConcurrentHashMap.newKeySet())
+				.computeIfAbsent(bucketFor(event), ignored -> new HashSet<>())
 				.add(event);
 	}
 
 	/**
 	 * Removes timestamp-expired observations from the head of the ordered queue.
 	 */
-	public void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
+	public synchronized void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
 		Instant cutoff = referenceTime.minusSeconds(maxTimeGapSeconds);
 
 		while (true) {
@@ -100,11 +103,10 @@ public class EventWindow {
 				return;
 			}
 
-			if (events.poll() == event) {
-				removeFromBucket(event);
-				EventKey key = new EventKey(event.source(), event.eventId());
-				latestByIdentity.remove(key, event);
-			}
+			events.poll();
+			removeFromBucket(event);
+			EventKey key = new EventKey(event.source(), event.eventId());
+			latestByIdentity.remove(key, event);
 		}
 	}
 
@@ -117,7 +119,7 @@ public class EventWindow {
 
 		bucketEvents.remove(event);
 		if (bucketEvents.isEmpty()) {
-			buckets.remove(bucket, bucketEvents);
+			buckets.remove(bucket);
 		}
 	}
 
