@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class EventWindow {
 
+	private static final double EARTH_RADIUS_KM = 6371.0;
 	private static final double LAT_CELL_DEGREES = 0.1;
 	private static final double LON_CELL_DEGREES = 0.1;
 	private static final int LON_BUCKET_COUNT = 3600;
@@ -42,31 +43,67 @@ public class EventWindow {
 	/**
 	 * Returns events from geographic buckets that could contain a match within
 	 * {@code maxDistanceKm}. The caller still performs the exact Haversine check.
+	 *
+	 * <p>Latitude coverage is derived from the spherical angular radius. Longitude
+	 * coverage uses the worst-case latitude reached by that radius, because the
+	 * east-west distance represented by one degree of longitude shrinks toward
+	 * the poles. When the search radius reaches a pole, every longitude can be
+	 * within the spherical cap, so all longitude buckets are inspected.
 	 */
 	public synchronized List<Event> getNearbyEvents(Event reference, double maxDistanceKm) {
-		int centerLatBucket = latBucket(reference.latitude());
+		double radiusKm = Math.max(0.0, maxDistanceKm);
+		double angularRadiusDegrees = Math.min(
+				180.0,
+				Math.toDegrees(radiusKm / EARTH_RADIUS_KM));
+
+		double minLatitude = Math.max(-90.0, reference.latitude() - angularRadiusDegrees);
+		double maxLatitude = Math.min(90.0, reference.latitude() + angularRadiusDegrees);
+
+		int minLatBucket = latBucket(minLatitude);
+		int maxLatBucket = latBucket(maxLatitude);
+
+		boolean searchAllLongitudes = minLatitude <= -90.0 || maxLatitude >= 90.0;
 		int centerLonBucket = lonBucket(reference.longitude());
+		int lonRadius = 0;
 
-		int latRadius = Math.max(
-				1,
-				(int) Math.ceil(maxDistanceKm / (111.32 * LAT_CELL_DEGREES)));
+		if (!searchAllLongitudes) {
+			double worstAbsoluteLatitude = Math.max(
+					Math.abs(minLatitude),
+					Math.abs(maxLatitude));
+			double cosLatitude = Math.cos(Math.toRadians(worstAbsoluteLatitude));
 
-		double latitudeRadians = Math.toRadians(reference.latitude());
-		double kmPerLongitudeDegree = 111.32 * Math.max(Math.cos(latitudeRadians), 0.01);
-		int lonRadius = Math.max(
-				1,
-				(int) Math.ceil(maxDistanceKm
-						/ (kmPerLongitudeDegree * LON_CELL_DEGREES)));
+			if (cosLatitude <= 1.0e-12) {
+				searchAllLongitudes = true;
+			} else {
+				double longitudeRadiusDegrees = Math.min(
+						180.0,
+						Math.toDegrees(radiusKm / (EARTH_RADIUS_KM * cosLatitude)));
+
+				if (longitudeRadiusDegrees >= 180.0) {
+					searchAllLongitudes = true;
+				} else {
+					lonRadius = Math.max(
+							0,
+							(int) Math.ceil(longitudeRadiusDegrees / LON_CELL_DEGREES));
+				}
+			}
+		}
 
 		List<Event> candidates = new ArrayList<>();
-		for (int latOffset = -latRadius; latOffset <= latRadius; latOffset++) {
-			int lat = centerLatBucket + latOffset;
-			for (int lonOffset = -lonRadius; lonOffset <= lonRadius; lonOffset++) {
-				int lon = Math.floorMod(centerLonBucket + lonOffset, LON_BUCKET_COUNT);
-				Set<Event> bucketEvents = buckets.get(new GeoBucket(lat, lon));
-				if (bucketEvents != null) {
-					candidates.addAll(bucketEvents);
+
+		for (int latBucket = minLatBucket; latBucket <= maxLatBucket; latBucket++) {
+			if (searchAllLongitudes) {
+				for (int lonBucket = 0; lonBucket < LON_BUCKET_COUNT; lonBucket++) {
+					addBucketCandidates(candidates, latBucket, lonBucket);
 				}
+				continue;
+			}
+
+			for (int lonOffset = -lonRadius; lonOffset <= lonRadius; lonOffset++) {
+				int lonBucket = Math.floorMod(
+						centerLonBucket + lonOffset,
+						LON_BUCKET_COUNT);
+				addBucketCandidates(candidates, latBucket, lonBucket);
 			}
 		}
 
@@ -107,6 +144,13 @@ public class EventWindow {
 			removeFromBucket(event);
 			EventKey key = new EventKey(event.source(), event.eventId());
 			latestByIdentity.remove(key, event);
+		}
+	}
+
+	private void addBucketCandidates(List<Event> candidates, int latitude, int longitude) {
+		Set<Event> bucketEvents = buckets.get(new GeoBucket(latitude, longitude));
+		if (bucketEvents != null) {
+			candidates.addAll(bucketEvents);
 		}
 	}
 

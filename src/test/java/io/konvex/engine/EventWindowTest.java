@@ -1,8 +1,10 @@
 package io.konvex.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.konvex.model.Event;
+import io.konvex.util.GeoUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -150,6 +152,71 @@ class EventWindowTest {
 
 		assertEquals(1, sharedCandidates.size());
 		assertEquals("shared-event", sharedCandidates.get(0).eventId());
+	}
+
+	@Test
+	void returnsCandidatesAtHighLatitude() {
+		EventWindow window = new EventWindow();
+		Instant now = Instant.parse("2026-03-15T10:30:00Z");
+		Event reference = event("reference", "ref", 70.0, 10.09, now);
+		Event nearby = event(
+				"aircraft",
+				"high-latitude",
+				69.9755,
+				10.2001,
+				now.plusSeconds(10));
+
+		window.add(nearby);
+
+		double distanceKm = GeoUtils.haversineDistanceKm(
+				reference.latitude(),
+				reference.longitude(),
+				nearby.latitude(),
+				nearby.longitude());
+
+		assertTrue(distanceKm <= 5.0);
+		assertEquals(1, window.getNearbyEvents(reference, 5.0).size());
+		assertEquals("high-latitude", window.getNearbyEvents(reference, 5.0).get(0).eventId());
+	}
+
+	@Test
+	void wrapsAcrossAntimeridian() {
+		EventWindow window = new EventWindow();
+		Instant now = Instant.parse("2026-03-15T10:30:00Z");
+		Event reference = event("reference", "ref", 0.0, 179.98, now);
+		Event nearby = event("sensor", "across-180", 0.0, -179.99, now);
+
+		double distanceKm = GeoUtils.haversineDistanceKm(
+				reference.latitude(),
+				reference.longitude(),
+				nearby.latitude(),
+				nearby.longitude());
+
+		window.add(nearby);
+
+		assertTrue(distanceKm <= 5.0);
+		assertEquals(1, window.getNearbyEvents(reference, 5.0).size());
+		assertEquals("across-180", window.getNearbyEvents(reference, 5.0).get(0).eventId());
+	}
+
+	@Test
+	void coversAllLongitudesWhenSearchRadiusReachesPole() {
+		EventWindow window = new EventWindow();
+		Instant now = Instant.parse("2026-03-15T10:30:00Z");
+		Event reference = event("reference", "ref", 89.95, 0.0, now);
+		Event nearby = event("aircraft", "near-pole", 89.99, 170.0, now);
+
+		double distanceKm = GeoUtils.haversineDistanceKm(
+				reference.latitude(),
+				reference.longitude(),
+				nearby.latitude(),
+				nearby.longitude());
+
+		window.add(nearby);
+
+		assertTrue(distanceKm <= 10.0);
+		assertEquals(1, window.getNearbyEvents(reference, 10.0).size());
+		assertEquals("near-pole", window.getNearbyEvents(reference, 10.0).get(0).eventId());
 	}
 
 	private static Event event(
