@@ -64,7 +64,7 @@ class HistoryApiPostgresIntegrationTest {
 
 	@Test
 	void persistsEventsAndMatchesAndExposesHistoryThroughApi() throws Exception {
-		Instant baseTime = Instant.parse("2026-03-15T10:30:00Z");
+		Instant baseTime = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
 		Event first = event("camera-a", "evt-1", 28.6129, 77.2295, baseTime);
 		Event second = event("camera-b", "evt-2", 28.6135, 77.2302, baseTime.plusSeconds(10));
 
@@ -79,8 +79,8 @@ class HistoryApiPostgresIntegrationTest {
 		}
 
 		mockMvc.perform(get("/api/matches")
-					.param("from", "2026-03-15T10:30:00Z")
-					.param("to", "2026-03-15T10:31:00Z")
+					.param("from", baseTime.minusSeconds(1).toString())
+					.param("to", baseTime.plusSeconds(60).toString())
 					.param("source", "camera-b")
 					.param("page", "0")
 					.param("size", "10")
