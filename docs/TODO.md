@@ -7,7 +7,7 @@
 - [x] 1.3 Out-of-order events. Define and implement behavior for timestamps older than the current window cutoff; never move the cutoff backwards. Document and test the decision.
 - [x] 1.4 Extract EventWindow behind an interface (for example EventStore), keeping the current in-memory implementation and behavior.
 - [x] 1.5 PostgreSQL persistence using Spring Data JPA + Flyway migrations. Persist accepted events and correlation matches while keeping the in-memory window as the matching fast path.
-- [ ] 1.6 History API: GET /api/matches?from=&to=&source=&page=&size= and GET /api/events/{source}/{eventId}, with validated ISO-8601 parameters and API-key protection.
+- [x] 1.6 History API: GET /api/matches?from=&to=&source=&page=&size= and GET /api/events/{source}/{eventId}, with validated ISO-8601 parameters and API-key protection.
 - [ ] 1.7 Testcontainers integration tests with real PostgreSQL for persistence and history API.
 - [ ] 1.8 Update docs/TODO.md, run the full test suite, verify Phase 1, then stop.
 
