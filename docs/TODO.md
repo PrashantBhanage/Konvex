@@ -5,7 +5,7 @@
 - [x] 1.1 Thread safety audit. Review EventWindow concurrency, make it thread-safe, and add a concurrent ingest test with no exceptions, lost state, or duplicate state.
 - [x] 1.2 Grid index fix. Make neighbor-cell lookup cover the full max-distance radius at any latitude; handle antimeridian wrap and poles. Add high-latitude and antimeridian tests.
 - [x] 1.3 Out-of-order events. Define and implement behavior for timestamps older than the current window cutoff; never move the cutoff backwards. Document and test the decision.
-- [ ] 1.4 Extract EventWindow behind an interface (for example EventStore), keeping the current in-memory implementation and behavior.
+- [x] 1.4 Extract EventWindow behind an interface (for example EventStore), keeping the current in-memory implementation and behavior.
 - [ ] 1.5 PostgreSQL persistence using Spring Data JPA + Flyway migrations. Persist accepted events and correlation matches while keeping the in-memory window as the matching fast path.
 - [ ] 1.6 History API: GET /api/matches?from=&to=&source=&page=&size= and GET /api/events/{source}/{eventId}, with validated ISO-8601 parameters and API-key protection.
 - [ ] 1.7 Testcontainers integration tests with real PostgreSQL for persistence and history API.
