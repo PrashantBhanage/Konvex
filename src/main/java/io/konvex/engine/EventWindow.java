@@ -33,6 +33,17 @@ public class EventWindow {
 	private final Map<GeoBucket, Set<Event>> buckets = new HashMap<>();
 
 	/**
+	 * Highest event timestamp observed by the window. It acts as an event-time
+	 * watermark and only moves forward, even when events arrive out of order.
+	 */
+	private Instant eventTimeWatermark = Instant.MIN;
+
+	/**
+	 * Current timestamp cutoff derived from the monotonic event-time watermark.
+	 */
+	private Instant retentionCutoff = Instant.MIN;
+
+	/**
 	 * Returns a stable snapshot containing the latest retained observation for
 	 * each source/event ID.
 	 */
@@ -113,8 +124,18 @@ public class EventWindow {
 	/**
 	 * Adds a newly seen event and replaces any older indexed observation with
 	 * the same source and event ID.
+	 *
+	 * <p>Out-of-order policy: correlation is evaluated before retention. An event
+	 * older than the current {@link #retentionCutoff} can still match retained
+	 * events if it satisfies the normal spatial/temporal rule, but it is not
+	 * retained and therefore cannot move the event-time watermark backwards or
+	 * replace a newer observation.
 	 */
 	public synchronized void add(Event event) {
+		if (event.timestamp().isBefore(retentionCutoff)) {
+			return;
+		}
+
 		EventKey key = new EventKey(event.source(), event.eventId());
 		Event previous = latestByIdentity.put(key, event);
 
@@ -129,14 +150,23 @@ public class EventWindow {
 	}
 
 	/**
-	 * Removes timestamp-expired observations from the head of the ordered queue.
+	 * Advances the event-time watermark monotonically and removes observations
+	 * older than the resulting retention cutoff.
+	 *
+	 * <p>Passing an older reference time never moves the cutoff backwards.
+	 * This makes event-time expiry deterministic when REST and OpenSky events
+	 * arrive out of order.
 	 */
 	public synchronized void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
-		Instant cutoff = referenceTime.minusSeconds(maxTimeGapSeconds);
+		if (referenceTime.isAfter(eventTimeWatermark)) {
+			eventTimeWatermark = referenceTime;
+		}
+
+		retentionCutoff = eventTimeWatermark.minusSeconds(maxTimeGapSeconds);
 
 		while (true) {
 			Event event = events.peek();
-			if (event == null || !event.timestamp().isBefore(cutoff)) {
+			if (event == null || !event.timestamp().isBefore(retentionCutoff)) {
 				return;
 			}
 

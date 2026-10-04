@@ -77,6 +77,43 @@ class CorrelationEngineTest {
 		assertEquals(2, matches.size());
 	}
 
+	@Test
+	void outOfOrderEventCanMatchCurrentWindowButIsNotRetained() {
+		MatchingProperties properties = new MatchingProperties();
+		EventWindow window = new EventWindow();
+		correlationEngine = new CorrelationEngine(
+				new MatchingService(properties),
+				properties,
+				window);
+
+		Instant t0 = Instant.parse("2026-03-15T10:00:00Z");
+		Event retained = event("sensor", "retained", 28.6129, 77.2295, t0);
+		Event watermarkAnchor = event(
+				"anchor",
+				"anchor",
+				19.0760,
+				72.8777,
+				t0.plusSeconds(60));
+		Event late = event(
+				"late-source",
+				"late",
+				28.6130,
+				77.2296,
+				t0.minusSeconds(20));
+
+		correlationEngine.processEvent(retained);
+		correlationEngine.processEvent(watermarkAnchor);
+
+		List<CorrelationMatch> matches = correlationEngine.processEvent(late);
+
+		assertEquals(1, matches.size());
+		assertEquals("retained", matches.get(0).matchedEventId());
+		assertTrue(window.getRecentEvents().stream()
+				.noneMatch(event -> "late".equals(event.eventId())));
+		assertTrue(window.getRecentEvents().stream()
+				.anyMatch(event -> "retained".equals(event.eventId())));
+	}
+
 	private static Event event(
 			String source,
 			String eventId,
