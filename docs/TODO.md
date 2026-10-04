@@ -2,7 +2,7 @@
 
 ## Phase 1 — Correctness and Persistence
 
-- [ ] 1.1 Thread safety audit. Review EventWindow concurrency, make it thread-safe, and add a concurrent ingest test with no exceptions, lost state, or duplicate state.
+- [x] 1.1 Thread safety audit. Review EventWindow concurrency, make it thread-safe, and add a concurrent ingest test with no exceptions, lost state, or duplicate state.
 - [ ] 1.2 Grid index fix. Make neighbor-cell lookup cover the full max-distance radius at any latitude; handle antimeridian wrap and poles. Add high-latitude and antimeridian tests.
 - [ ] 1.3 Out-of-order events. Define and implement behavior for timestamps older than the current window cutoff; never move the cutoff backwards. Document and test the decision.
 - [ ] 1.4 Extract EventWindow behind an interface (for example EventStore), keeping the current in-memory implementation and behavior.
