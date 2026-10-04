@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * stay atomic across the timestamp queue, identity index, and geographic index.
  */
 @Component
-public class EventWindow {
+public class EventWindow implements EventStore {
 
 	private static final double EARTH_RADIUS_KM = 6371.0;
 	private static final double LAT_CELL_DEGREES = 0.1;
@@ -47,6 +47,7 @@ public class EventWindow {
 	 * Returns a stable snapshot containing the latest retained observation for
 	 * each source/event ID.
 	 */
+	@Override
 	public synchronized List<Event> getRecentEvents() {
 		return List.copyOf(latestByIdentity.values());
 	}
@@ -61,6 +62,7 @@ public class EventWindow {
 	 * the poles. When the search radius reaches a pole, every longitude can be
 	 * within the spherical cap, so all longitude buckets are inspected.
 	 */
+	@Override
 	public synchronized List<Event> getNearbyEvents(Event reference, double maxDistanceKm) {
 		double radiusKm = Math.max(0.0, maxDistanceKm);
 		double angularRadiusDegrees = Math.min(
@@ -131,6 +133,7 @@ public class EventWindow {
 	 * retained and therefore cannot move the event-time watermark backwards or
 	 * replace a newer observation.
 	 */
+	@Override
 	public synchronized void add(Event event) {
 		if (event.timestamp().isBefore(retentionCutoff)) {
 			return;
@@ -157,6 +160,7 @@ public class EventWindow {
 	 * This makes event-time expiry deterministic when REST and OpenSky events
 	 * arrive out of order.
 	 */
+	@Override
 	public synchronized void evictExpired(Instant referenceTime, long maxTimeGapSeconds) {
 		if (referenceTime.isAfter(eventTimeWatermark)) {
 			eventTimeWatermark = referenceTime;

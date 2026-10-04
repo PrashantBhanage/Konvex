@@ -24,15 +24,15 @@ public class CorrelationEngine {
 
 	private final MatchingService matchingService;
 	private final MatchingProperties matchingProperties;
-	private final EventWindow eventWindow;
+	private final EventStore eventStore;
 
 	public CorrelationEngine(
 			MatchingService matchingService,
 			MatchingProperties matchingProperties,
-			EventWindow eventWindow) {
+			EventStore eventStore) {
 		this.matchingService = matchingService;
 		this.matchingProperties = matchingProperties;
-		this.eventWindow = eventWindow;
+		this.eventStore = eventStore;
 	}
 
 	/**
@@ -40,7 +40,7 @@ public class CorrelationEngine {
 	 * the configured spatial and temporal matching thresholds.
 	 */
 	public List<CorrelationMatch> processEvent(Event newEvent) {
-		eventWindow.evictExpired(
+		eventStore.evictExpired(
 				newEvent.timestamp(),
 				matchingProperties.getMaxTimeGapSeconds());
 
